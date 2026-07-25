@@ -13,7 +13,7 @@ void check(const std::string& testName, bool condition) {
 }
 
 int main() {
-    int n = 4; // shingle size, matches main.cpp
+    int n = DEFAULT_SHINGLE_SIZE;
 
     // -----------------------------------------------------------------
     // Test 1: Completely unrelated documents -> should be ~0% similarity

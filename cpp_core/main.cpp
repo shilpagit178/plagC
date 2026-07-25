@@ -14,7 +14,7 @@ int main() {
         "is a subset of artificial intelligence that focuses on building "
         "systems that learn from data, and it has grown rapidly since 2010.";
 
-    int shingleSize = 4; // start with 4-word shingles, as discussed
+    int shingleSize = DEFAULT_SHINGLE_SIZE;
 
     PlagiarismResult result = compareTexts(docA, docB, shingleSize);
 

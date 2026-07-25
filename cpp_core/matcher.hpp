@@ -4,6 +4,12 @@
 #include <string>
 #include <vector>
 
+// Fixed shingle size for now (see README for the sensitivity/specificity
+// tradeoff discussion). Centralized here so every caller -- main.cpp,
+// test files, and later the PyBind11 binding -- uses the same value
+// instead of a magic number copy-pasted in multiple places.
+constexpr int DEFAULT_SHINGLE_SIZE = 4;
+
 // A single contiguous block of matched text between the two documents.
 // Positions are WORD indices (not character indices) into the tokenized
 // version of each document -- we'll convert back to character offsets
