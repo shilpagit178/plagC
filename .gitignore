@@ -3,8 +3,10 @@
 *.obj
 *.exe
 *.out
-test_matcher
 cpp_core/test_matcher
+cpp_core/test_edge_cases
+cpp_core/*_test
+cpp_core/test_*
 
 # PyBind11 / Python compiled extension modules
 *.so
