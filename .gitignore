@@ -1,0 +1,33 @@
+# Compiled C++ binaries and objects
+*.o
+*.obj
+*.exe
+*.out
+test_matcher
+cpp_core/test_matcher
+
+# PyBind11 / Python compiled extension modules
+*.so
+*.pyd
+__pycache__/
+*.pyc
+
+# Python virtual environments
+venv/
+.venv/
+env/
+
+# Flask
+instance/
+.flaskenv
+
+# Build directories
+build/
+dist/
+*.egg-info/
+
+# OS / editor junk
+.DS_Store
+.vscode/
+.idea/
+*.swp
