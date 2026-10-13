@@ -10,6 +10,11 @@
 // instead of a magic number copy-pasted in multiple places.
 constexpr int DEFAULT_SHINGLE_SIZE = 4;
 
+// If one shingle appears more than this many times in Document B, we only
+// keep the first few locations. Without a limit, text that repeats a lot
+// (like the same word 5000 times) makes the number of match pairs explode.
+constexpr int MAX_LOCATIONS_PER_SHINGLE = 20;
+
 // A single contiguous block of matched text between the two documents.
 // Positions are WORD indices (not character indices) into the tokenized
 // version of each document -- we'll convert back to character offsets

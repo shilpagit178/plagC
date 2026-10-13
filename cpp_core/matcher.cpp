@@ -108,16 +108,15 @@ std::vector<RawMatch> findRawMatches(
         auto it = indexB.find(h);
         if (it == indexB.end()) continue; // no candidate at all -> definitely no match
 
+        int keptForThisShingle = 0;
         for (const auto& candidate : it->second) {
             if (candidate.second == shinglesA[i]) {
                 // Verified real match (not just a hash collision)
                 matches.push_back({i, candidate.first});
-
-                //break; // one match per position in A is enough for now
-
-                // no break: if this shingle shows up several times in B,
-                // keep every location and let the merge step work out
-                // which one is the real continuation
+                keptForThisShingle++;
+                // a shingle that appears this many times in B is a very
+                // common phrase, not evidence of copying -- stop collecting
+                if (keptForThisShingle >= MAX_LOCATIONS_PER_SHINGLE) break;
             }
         }
     }

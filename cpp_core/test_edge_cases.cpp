@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <cassert>
+#include <chrono>
 
 // Small helper so each test prints a clear pass/fail instead of us having
 // to eyeball raw numbers every time.
@@ -107,6 +108,24 @@ int main() {
             }
         }
         check("Repeated phrase in B -> reports the correct location in B", foundCorrectSpan);
+    }
+
+    // -----------------------------------------------------------------
+    // Test 8: the same word repeated thousands of times. Every shingle
+    // matches many places in B, so without a limit the number of match
+    // pairs explodes and this takes seconds instead of milliseconds.
+    // -----------------------------------------------------------------
+    {
+        std::string big;
+        for (int i = 0; i < 3000; i++) big += "go ";
+
+        auto start = std::chrono::steady_clock::now();
+        PlagiarismResult r = compareTexts(big, big, n);
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      std::chrono::steady_clock::now() - start).count();
+
+        check("Heavily repeated text -> still 100%", r.similarityPercent == 100.0);
+        check("Heavily repeated text -> finishes in under 500 ms", ms < 500);
     }
 
     std::cout << "\nAll edge case tests executed.\n";
