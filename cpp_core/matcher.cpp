@@ -112,7 +112,12 @@ std::vector<RawMatch> findRawMatches(
             if (candidate.second == shinglesA[i]) {
                 // Verified real match (not just a hash collision)
                 matches.push_back({i, candidate.first});
-                break; // one match per position in A is enough for now
+
+                //break; // one match per position in A is enough for now
+
+                // no break: if this shingle shows up several times in B,
+                // keep every location and let the merge step work out
+                // which one is the real continuation
             }
         }
     }
@@ -137,8 +142,18 @@ std::vector<MatchSpan> mergeMatches(std::vector<RawMatch> matches, int shingleSi
     std::vector<MatchSpan> spans;
     if (matches.empty()) return spans;
 
-    // Sort by position in A so consecutive shingles are next to each other
+    // // Sort by position in A so consecutive shingles are next to each other
+    // std::sort(matches.begin(), matches.end(), [](const RawMatch& a, const RawMatch& b) {
+    //     return a.posInA < b.posInA;
+    // });
+
+    //replaced prev sort logic to -->
+    // a copied run keeps the same (posInB - posInA) for every shingle in it,
+    // so sort by that "diagonal" first, then by position in A
     std::sort(matches.begin(), matches.end(), [](const RawMatch& a, const RawMatch& b) {
+        int diagA = a.posInB - a.posInA;
+        int diagB = b.posInB - b.posInA;
+        if (diagA != diagB) return diagA < diagB;
         return a.posInA < b.posInA;
     });
 
@@ -154,7 +169,7 @@ std::vector<MatchSpan> mergeMatches(std::vector<RawMatch> matches, int shingleSi
         // Does this shingle continue the current chain? Both documents
         // must advance by exactly one word position for it to be the
         // same continuous run of copied text.
-        if (curA == prevA + 1 && curB == prevB + 1) {
+        if (curA == prevA + 1 && (curB - curA) == (prevB - prevA)) { 
             prevA = curA;
             prevB = curB;
             continue; // still in the same run, keep extending
@@ -184,6 +199,11 @@ std::vector<MatchSpan> mergeMatches(std::vector<RawMatch> matches, int shingleSi
         chainStartB,
         prevB + shingleSize - 1,
         (prevA + shingleSize - 1) - chainStartA + 1
+    });
+
+    std::sort(spans.begin(), spans.end(), [](const MatchSpan& a, const MatchSpan& b) {
+    if (a.startInA != b.startInA) return a.startInA < b.startInA;
+        return a.startInB < b.startInB;
     });
 
     return spans;

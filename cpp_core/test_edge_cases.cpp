@@ -89,6 +89,26 @@ int main() {
         check("Case/punctuation-insensitive matching", r.similarityPercent == 100.0);
     }
 
+    // -----------------------------------------------------------------
+    // Test 7: a phrase shows up twice in B, but the real copy is the
+    // second one. The old code only remembered the first occurrence,
+    // so it pointed at the wrong place in B.
+    // -----------------------------------------------------------------
+    {
+        std::string a = "x y z w";
+        std::string b = "y z q y z w";
+        PlagiarismResult r = compareTexts(a, b, 2);
+
+        bool foundCorrectSpan = false;
+        for (const auto& m : r.matches) {
+            if (m.startInA == 1 && m.endInA == 3 &&
+                m.startInB == 3 && m.endInB == 5) {
+                foundCorrectSpan = true;
+            }
+        }
+        check("Repeated phrase in B -> reports the correct location in B", foundCorrectSpan);
+    }
+
     std::cout << "\nAll edge case tests executed.\n";
     return 0;
 }
