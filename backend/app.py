@@ -16,6 +16,17 @@ import matcher_module  # noqa: E402  (has to come after the sys.path line)
 
 app = Flask(__name__)
 
+# limits, so one huge request can't tie up the server
+MAX_WORDS = 10000                      # per text
+app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024   # whole request body: 1 MB
+
+
+@app.errorhandler(413)
+def body_too_large(error):
+    # Flask raises 413 on its own when the body is over MAX_CONTENT_LENGTH.
+    # By default that comes back as an HTML page; our frontend expects JSON.
+    return jsonify({"error": "request is too large (limit is 1 MB)"}), 413
+
 
 @app.route("/api/health")
 def health():
@@ -38,6 +49,10 @@ def check():
         return jsonify({"error": "textA and textB must both be strings"}), 400
     if not text_a.strip() or not text_b.strip():
         return jsonify({"error": "textA and textB cannot be empty"}), 400
+
+     # split() is a cheap word count, good enough for a size limit
+    if len(text_a.split()) > MAX_WORDS or len(text_b.split()) > MAX_WORDS:
+        return jsonify({"error": f"each text can be at most {MAX_WORDS} words"}), 413
 
     # time only the C++ call, so the number means "how long the engine took"
     start = time.perf_counter()
