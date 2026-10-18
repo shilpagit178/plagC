@@ -14,10 +14,15 @@ sys.path.append(CPP_DIR)
 
 import matcher_module  # noqa: E402  (has to come after the sys.path line)
 
+from scraper import FetchError, fetch_text  # noqa: E402
+
 app = Flask(__name__)
 
 # limits, so one huge request can't tie up the server
-MAX_WORDS = 10000                      # per text
+
+MAX_WORDS = 10000                      # per pasted text
+MAX_WORDS_FETCHED = 100000             # a fetched page is cut to this many words
+
 app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024   # whole request body: 1 MB
 
 
@@ -33,7 +38,9 @@ def health():
     # quick "is the server alive and did the C++ module load" check
     return jsonify({"status": "ok", "cpp_module": matcher_module.__name__})
 
+
 @app.route("/api/check", methods=["POST"])
+
 def check():
     # silent=True means "give me None if the body isn't valid JSON"
     # instead of Flask raising its own error page
@@ -43,16 +50,43 @@ def check():
 
     text_a = data.get("textA")
     text_b = data.get("textB")
+    url_b = data.get("urlB")
 
-    # both must be real strings with something in them
-    if not isinstance(text_a, str) or not isinstance(text_b, str):
-        return jsonify({"error": "textA and textB must both be strings"}), 400
-    if not text_a.strip() or not text_b.strip():
-        return jsonify({"error": "textA and textB cannot be empty"}), 400
+    # Document B comes from pasted text OR from a link, never both, never neither
+    if (text_b is None) == (url_b is None):
+        return jsonify({"error": "send exactly one of textB or urlB"}), 400
 
-     # split() is a cheap word count, good enough for a size limit
-    if len(text_a.split()) > MAX_WORDS or len(text_b.split()) > MAX_WORDS:
+    if not isinstance(text_a, str) or not text_a.strip():
+        return jsonify({"error": "textA must be a non-empty string"}), 400
+    # split() is a cheap word count, good enough for a size limit
+    if len(text_a.split()) > MAX_WORDS:
         return jsonify({"error": f"each text can be at most {MAX_WORDS} words"}), 413
+
+    fetch_ms = None
+    truncated_b = False
+
+    if url_b is not None:
+        if not isinstance(url_b, str) or not url_b.strip():
+            return jsonify({"error": "urlB must be a non-empty string"}), 400
+
+        fetch_start = time.perf_counter()
+        try:
+            text_b = fetch_text(url_b.strip())
+        except FetchError as e:
+            # the scraper already chose a safe message and a fitting status code
+            return jsonify({"error": e.message}), e.status
+        fetch_ms = (time.perf_counter() - fetch_start) * 1000
+
+        # pages are often long, so cut instead of refusing, and tell the caller
+        words = text_b.split()
+        if len(words) > MAX_WORDS_FETCHED:
+            text_b = " ".join(words[:MAX_WORDS_FETCHED])
+            truncated_b = True
+    else:
+        if not isinstance(text_b, str) or not text_b.strip():
+            return jsonify({"error": "textB must be a non-empty string"}), 400
+        if len(text_b.split()) > MAX_WORDS:
+            return jsonify({"error": f"each text can be at most {MAX_WORDS} words"}), 413
 
     # time only the C++ call, so the number means "how long the engine took"
     start = time.perf_counter()
@@ -78,6 +112,8 @@ def check():
         "totalMatchedWordsInA": result.totalMatchedWordsInA,
         "matches": matches,
         "elapsedMs": round(elapsed_ms, 3),
+        "fetchMs": None if fetch_ms is None else round(fetch_ms, 1),
+        "truncatedB": truncated_b,
     })
 
 

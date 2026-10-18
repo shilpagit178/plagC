@@ -4,7 +4,9 @@
 
 import sys
 
+import app as app_module
 from app import app
+from scraper import FetchError
 
 client = app.test_client()
 failed = 0
@@ -56,6 +58,43 @@ big_body = client.post("/api/check", data=b'{"textA": "' + b"x " * 600000 + b'",
                        content_type="application/json")
 check("body over 1 MB -> 413 with a json error", big_body.status_code == 413 and "error" in big_body.get_json())
 
+
+# --- document B from a link (the network is faked here, no internet needed) ---
+real_fetch = app_module.fetch_text
+app_module.fetch_text = lambda url: "a quick brown fox jumps today"
+
+r = post({"textA": "the quick brown fox jumps", "urlB": "https://example.com/page"})
+d = r.get_json()
+check("urlB -> 200 and same result as pasted text", r.status_code == 200 and d["similarityPercent"] == 80.0)
+check("urlB -> reports how long the fetch took", isinstance(d["fetchMs"], float))
+check("pasted text -> fetchMs is null", post({"textA": "a b c d e", "textB": "a b c d e"}).get_json()["fetchMs"] is None)
+check("short page -> not truncated", d["truncatedB"] is False)
+
+check("both textB and urlB -> 400", post({"textA": "hi there", "textB": "x y", "urlB": "https://example.com"}).status_code == 400)
+check("neither textB nor urlB -> 400", post({"textA": "hi there"}).status_code == 400)
+check("urlB not a string -> 400", post({"textA": "hi there", "urlB": 5}).status_code == 400)
+check("blank urlB -> 400", post({"textA": "hi there", "urlB": "   "}).status_code == 400)
+
+app_module.fetch_text = lambda url: " ".join(["word"] * 150000)
+r = post({"textA": "word word word word", "urlB": "https://example.com/long"})
+check("very long page -> cut and flagged", r.status_code == 200 and r.get_json()["truncatedB"] is True)
+
+def failing(message, status):
+    def fake(url):
+        raise FetchError(message, status)
+    return fake
+
+app_module.fetch_text = failing("the website took too long to respond", 504)
+r = post({"textA": "hi there", "urlB": "https://slow.example"})
+check("fetch error -> its message and status reach the caller",
+      r.status_code == 504 and r.get_json()["error"] == "the website took too long to respond")
+
+# now the real safety check, no fake: internal addresses must be refused end to end
+app_module.fetch_text = real_fetch
+for bad in ("http://127.0.0.1/", "http://localhost:80/", "http://169.254.169.254/latest/meta-data", "file:///etc/passwd"):
+    r = post({"textA": "hi there", "urlB": bad})
+    check(f"real guard refuses {bad} -> 400", r.status_code == 400 and "error" in r.get_json())
+    
 print()
 if failed == 0:
     print("all api checks passed")
