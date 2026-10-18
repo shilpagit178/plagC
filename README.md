@@ -1,31 +1,38 @@
 # plagC — web-based plagiarism detector
 
 A plagiarism checker with a C++ matching engine, exposed to Python through
-PyBind11 and served by a small Flask API. You give it two texts and it tells
-you what percentage of the first one appears in the second, which stretches
-matched, and how long the engine took.
+PyBind11 and served by a small Flask API. You give it a text and either a
+second text or a link, and it tells you what percentage of the first text
+appears in the second, which stretches matched, and how long the engine took.
 
-**Status: work in progress.** The engine, the Python bindings and the backend
-API are done and tested. URL input and the browser frontend are not built yet
+**Status: work in progress.** The engine, the Python bindings, the backend API
+and link fetching are done and tested. The browser frontend is not built yet
 (see the roadmap at the bottom).
 
 ## What it does today
 
 - Compares two texts for **exact** matches (word for word, ignoring case and
   punctuation).
+- Document B can be pasted text **or a link**: the server downloads the page
+  and extracts its readable text.
 - Reports the similarity as "percent of Document A that was found in
   Document B", plus the matched spans as word positions in both documents.
-- Rejects bad input with clear JSON errors and refuses oversized requests.
+- Rejects bad input with clear JSON errors, refuses oversized requests, and
+  refuses links that point at private or internal addresses.
 
-It does not detect paraphrasing yet, and it does not fetch URLs yet.
+It does not detect paraphrasing yet, and it does not search the web for
+sources on its own: you supply the text or the link to compare against.
 
 ## How it works
 
 ```
-POST /api/check  { textA, textB }
+POST /api/check  { textA, and either textB or urlB }
         |
    Flask (backend/app.py)         validates input, applies size limits
         |
+        |  if urlB:  scraper.py  checks the link is safe, downloads it with
+        |                        limits, strips the HTML down to readable text
+        v
    matcher_module (C++ via PyBind11)
         |   1. tokenize           lowercase, strip punctuation, split into words
         |   2. shingle            overlapping 4-word windows
@@ -33,7 +40,7 @@ POST /api/check  { textA, textB }
         |   4. merge              join neighbouring matches into longer spans
         |   5. score              matched words in A / total words in A
         v
-   JSON: similarityPercent, matches, elapsedMs, ...
+   JSON: similarityPercent, matches, elapsedMs, fetchMs, ...
 ```
 
 **Shingles.** Comparing single words is useless (every document contains
@@ -63,6 +70,31 @@ only question is "does this exact shingle exist in B?", which a hash map
 answers in O(1) on average. A trie starts to pay off with variable-length or
 prefix matching, which exact matching does not need.
 
+## Fetching links safely
+
+Because the server downloads whatever link a user gives it, a link can be used
+to make the server reach things only the server can reach, such as
+`http://localhost/...` or a cloud provider's internal metadata address. This
+is called server-side request forgery (SSRF). `backend/scraper.py` defends
+against it in layers:
+
+- Only `http` and `https`, only ports 80 and 443, no `user:password@` in the
+  link, and a maximum link length.
+- The hostname is resolved and **every** address it points to must be a public
+  address. Disguised forms such as `127.1`, `2130706433`, `0x7f000001` and
+  `::ffff:127.0.0.1` are caught because the check is on the resolved address,
+  not on the text of the link.
+- Redirects are followed manually (at most 3) and each hop is checked again,
+  so a harmless-looking page cannot redirect the server to an internal address.
+- Downloads are streamed with a 3 s connect timeout, a 5 s read timeout and a
+  10 s total limit, and stop at 2 MB of **decoded** content (so a small gzip
+  file that expands hugely is stopped too).
+- Only `text/html`, `application/xhtml+xml` and `text/plain` are accepted.
+- Page text is extracted with BeautifulSoup after removing `script`, `style`,
+  `nav`, `header`, `footer`, `aside`, `form`, `iframe` and similar tags.
+
+Known gaps: see "Known limitations" below (DNS rebinding, no rate limiting).
+
 ## Project layout
 
 ```
@@ -76,7 +108,11 @@ plagC/
 │   └── test_bindings.py     Python test of the compiled module
 ├── backend/
 │   ├── app.py               Flask API
-│   └── test_api.py          API tests
+│   ├── scraper.py           link safety check, download, HTML -> text
+│   ├── test_api.py          API tests
+│   ├── test_scraper.py      HTML -> text tests
+│   ├── test_url_safety.py   which links are allowed
+│   └── test_download.py     download limits, tested against a fake local server
 ├── frontend/                empty for now
 ├── requirements.txt
 └── README.md
@@ -126,10 +162,14 @@ up and the C++ module loaded.
 
 ### `POST /api/check`
 
-Request body (JSON):
+Send `textA` plus **exactly one** of `textB` (pasted text) or `urlB` (a link).
 
 ```json
 { "textA": "the quick brown fox jumps", "textB": "a quick brown fox jumps today" }
+```
+
+```json
+{ "textA": "the quick brown fox jumps", "urlB": "https://example.com/article" }
 ```
 
 Response (200):
@@ -142,29 +182,44 @@ Response (200):
   "matches": [
     { "startInA": 1, "endInA": 4, "startInB": 1, "endInB": 4, "wordCount": 4 }
   ],
-  "elapsedMs": 0.116
+  "elapsedMs": 0.116,
+  "fetchMs": null,
+  "truncatedB": false
 }
 ```
 
 - Positions are **word indices** (0-based, end inclusive), not character
   offsets.
-- `elapsedMs` measures only the C++ call.
-- The score is directional: it is the share of `textA` found in `textB`.
+- `elapsedMs` measures only the C++ call. `fetchMs` is how long downloading
+  the link took, and is `null` when Document B was pasted.
+- `truncatedB` is `true` when a fetched page was longer than 100,000 words and
+  was cut. Copied text past the cut-off would not be matched.
+- The score is directional: it is the share of `textA` found in Document B.
+
+Limits: pasted texts up to 10,000 words each, request body up to 1 MB, fetched
+pages up to 2 MB (cut to their first 100,000 words).
 
 Errors are JSON of the form `{"error": "..."}`:
 
 | Status | When |
 |--------|------|
-| 400 | body is not a JSON object, a field is missing or not a string, or a text is blank |
+| 400 | body is not a JSON object; `textA` missing, blank or not text; not exactly one of `textB` / `urlB`; `textB` or `urlB` blank or not text; the link is not allowed (wrong scheme or port, credentials, non-public address, unknown host); the link is not a web page or plain text |
 | 405 | wrong HTTP method |
-| 413 | a text is over 10,000 words, or the request body is over 1 MB |
+| 413 | pasted text over 10,000 words; request body over 1 MB; downloaded page over 2 MB |
+| 422 | the page had no readable text (it may build its content with JavaScript) |
+| 502 | the other website returned an error, could not be reached, or redirected too many times |
+| 504 | the other website took too long (over 10 seconds in total) |
 
-Example:
+Examples:
 
 ```bash
 curl -s -X POST localhost:5000/api/check \
   -H "Content-Type: application/json" \
   -d '{"textA":"the quick brown fox jumps","textB":"a quick brown fox jumps today"}'
+
+curl -s -X POST localhost:5000/api/check \
+  -H "Content-Type: application/json" \
+  -d '{"textA":"This domain is for use in documentation examples without needing permission.","urlB":"https://example.com"}'
 ```
 
 ## Tests
@@ -179,8 +234,11 @@ g++ -std=c++17 -Wall -o test_edge_cases test_edge_cases.cpp matcher.cpp
 python3 test_bindings.py
 cd ..
 
-# the API (no server needs to be running)
+# backend (none of these need the server running or the internet)
 python backend/test_api.py
+python backend/test_scraper.py
+python backend/test_url_safety.py
+python backend/test_download.py
 ```
 
 ## Known limitations
@@ -194,6 +252,16 @@ python backend/test_api.py
   on punctuation, so the limit is approximate.
 - Matches are word positions; mapping them back to character offsets for
   highlighting is not done yet.
+- **Pages that build their content with JavaScript come back empty**, because
+  the server only reads the HTML it is sent.
+- Removing `nav`, `header`, `footer` and `aside` is a heuristic; a site that
+  puts real content in those tags will lose it. The page title is kept.
+- **DNS rebinding is not fully closed.** The server resolves a hostname to
+  check it, and the HTTP library resolves it again to connect. A hostile name
+  could answer differently the second time. The full fix is to connect to the
+  exact address that was checked.
+- There is no rate limiting, and a slow download holds a server thread for up
+  to 10 seconds.
 - Only the Flask development server has been used.
 
 ## Roadmap
@@ -201,7 +269,7 @@ python backend/test_api.py
 - [x] Phase 1: C++ matching engine with edge-case tests
 - [x] Phase 2: PyBind11 bindings and a Python test
 - [x] Phase 3: Flask API with validation, size limits and tests
-- [ ] Phase 4: compare against a URL (fetch with requests, extract text with
-      BeautifulSoup, with protection against fetching private addresses)
+- [x] Phase 4: compare against a link (safe download, text extraction)
 - [ ] Phase 5: browser frontend with highlighted matches and the engine timer
-- [ ] Later: paraphrase detection, a non-English tokenizer, measured benchmarks
+- [ ] Later: paraphrase detection, a non-English tokenizer, closing the DNS
+      rebinding gap, rate limiting, measured benchmarks
