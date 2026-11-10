@@ -27,6 +27,14 @@ def post(payload):
 r = client.get("/api/health")
 check("health -> 200 and ok", r.status_code == 200 and r.get_json()["status"] == "ok")
 
+# --- the browser page ---
+r = client.get("/")
+check("home page -> 200 html", r.status_code == 200 and b"plagC" in r.data)
+check("stylesheet is served", client.get("/static/style.css").status_code == 200)
+check("script is served", client.get("/static/app.js").status_code == 200)
+check("unknown page -> 404", client.get("/nothing-here").status_code == 404)
+check("unknown file -> 404", client.get("/static/nothing.js").status_code == 404)
+
 # --- normal use ---
 r = post({"textA": "the quick brown fox jumps", "textB": "a quick brown fox jumps today"})
 d = r.get_json()
@@ -94,7 +102,15 @@ app_module.fetch_text = real_fetch
 for bad in ("http://127.0.0.1/", "http://localhost:80/", "http://169.254.169.254/latest/meta-data", "file:///etc/passwd"):
     r = post({"textA": "hi there", "urlB": bad})
     check(f"real guard refuses {bad} -> 400", r.status_code == 400 and "error" in r.get_json())
-    
+
+app_module.fetch_text = lambda url: "a quick brown fox jumps today"
+check("urlB -> returns the fetched text as sourceText",
+      post({"textA": "the quick brown fox jumps", "urlB": "https://example.com"}).get_json()["sourceText"] == "a quick brown fox jumps today")
+
+app_module.fetch_text = real_fetch
+check("pasted text -> sourceText is null",
+      post({"textA": "a b c d e", "textB": "a b c d e"}).get_json()["sourceText"] is None)
+
 print()
 if failed == 0:
     print("all api checks passed")

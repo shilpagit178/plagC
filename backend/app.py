@@ -2,7 +2,7 @@ import os
 import sys
 import time
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 
 # The compiled C++ module lives in ../cpp_core, not next to this file,
 # so Python doesn't know about it yet. Buildin' the path from THIS file's
@@ -16,7 +16,14 @@ import matcher_module  # noqa: E402  (has to come after the sys.path line)
 
 from scraper import FetchError, fetch_text  # noqa: E402
 
-app = Flask(__name__)
+# the browser page lives in ../frontend; Flask hands out its files from /static/
+FRONTEND_DIR = os.path.abspath(os.path.join(HERE, "..", "frontend"))
+app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="/static")
+
+
+@app.route("/")
+def index():
+    return send_from_directory(FRONTEND_DIR, "index.html")
 
 # limits, so one huge request can't tie up the server
 
@@ -114,6 +121,7 @@ def check():
         "elapsedMs": round(elapsed_ms, 3),
         "fetchMs": None if fetch_ms is None else round(fetch_ms, 1),
         "truncatedB": truncated_b,
+        "sourceText": text_b if url_b is not None else None,
     })
 
 
