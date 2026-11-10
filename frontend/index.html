@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>plagC - find what was copied</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="bar"><span class="mark">plagC</span><span class="sub">exact-match plagiarism checker</span></header>
+<main>
+  <h1>Find what was copied.</h1>
+  <p class="lede">Paste your text, then add a source: pasted text or a web page. plagC marks every passage that appears word for word in both.</p>
+
+  <form id="form" class="inputs" novalidate>
+    <section>
+      <div class="head"><label for="a">Your text</label><span class="count" id="ca">0 words</span></div>
+      <textarea id="a" placeholder="Paste the text you want to check"></textarea>
+    </section>
+    <section>
+      <div class="head">
+        <div class="seg" role="tablist" aria-label="Source type">
+          <button type="button" role="tab" id="tt" aria-selected="true">Source text</button>
+          <button type="button" role="tab" id="tu" aria-selected="false">Web page</button>
+        </div>
+        <span class="count" id="cb">0 words</span>
+      </div>
+      <textarea id="b" placeholder="Paste the source text"></textarea>
+      <input id="u" type="url" placeholder="https://example.com/article" hidden aria-label="Web page address">
+      <p class="hint" id="hint">Up to 10,000 words per text.</p>
+    </section>
+    <div class="actions">
+      <button class="go" id="go" disabled>Check for copying</button>
+      <button type="button" class="ghost" id="ex">Try an example</button>
+    </div>
+  </form>
+
+  <div id="err" class="err" role="alert" hidden></div>
+
+  <section id="out" class="report" hidden aria-live="polite">
+    <div class="summary">
+      <div class="pct"><span id="pct">0</span><small>%</small></div>
+      <div class="said"><h2 id="verdict"></h2><p id="detail"></p></div>
+      <button type="button" class="ghost" id="print">Print report</button>
+    </div>
+    <div class="strip" id="strip" role="img" aria-label="Where the matches fall in your text"></div>
+    <p class="note" id="note"></p>
+    <ol class="legend" id="legend"></ol>
+    <div class="panes">
+      <article><h3>Your text</h3><div class="doc" id="da"></div></article>
+      <article><h3>Source</h3><div class="doc" id="db"></div></article>
+    </div>
+    <p class="fine">Matches are word for word, ignoring case and punctuation. Reworded text is not detected.</p>
+  </section>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>
