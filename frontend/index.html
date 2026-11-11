@@ -4,11 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>plagC - find what was copied</title>
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<header class="bar"><span class="mark">plagC</span><span class="sub">exact-match plagiarism checker</span></header>
+<header class="bar"><span class="mark">plagC</span><span class="sub">exact-match plagiarism checker</span>
+  <button type="button" class="tg" id="theme" aria-label="Switch between light and dark"><i></i>Theme</button></header>
 <main>
+  <div class="first">
   <h1>Find what was copied.</h1>
   <p class="lede">Paste your text, then add a source: pasted text or a web page. plagC marks every passage that appears word for word in both.</p>
 
@@ -34,6 +37,7 @@
       <button type="button" class="ghost" id="ex">Try an example</button>
     </div>
   </form>
+  </div>
 
   <div id="err" class="err" role="alert" hidden></div>
 

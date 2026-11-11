@@ -73,6 +73,7 @@ if (typeof document !== "undefined") {
   function show(d, textA, textB) {
     const pct = d.similarityPercent;
     $("pct").textContent = Math.round(pct);
+    $("out").dataset.band = pct < 15 ? "low" : pct < 40 ? "mid" : pct < 70 ? "high" : "max";
     $("verdict").textContent = pct === 0 ? "No copied passages found" : pct < 15 ? "Little overlap"
       : pct < 40 ? "Some overlap" : pct < 70 ? "Substantial overlap" : "Mostly copied";
     const n = d.matches.length, ms = d.elapsedMs + " ms engine" + (d.fetchMs != null ? ", " + d.fetchMs + " ms fetch" : "");
@@ -136,6 +137,12 @@ if (typeof document !== "undefined") {
   $("tu").onclick = () => setMode("url");
   ["a", "b", "u"].forEach((id) => $(id).addEventListener("input", refresh));
   $("print").onclick = () => window.print();
+  $("theme").onclick = () => {
+    const root = document.documentElement;
+    const now = root.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    root.dataset.theme = now === "dark" ? "light" : "dark";
+    try { localStorage.setItem("theme", root.dataset.theme); } catch (e) {}
+  };
   $("ex").onclick = () => {
     setMode("text");
     $("a").value = "Machine learning is a subset of artificial intelligence that focuses on building systems that learn from data. Instead of being explicitly programmed, these systems improve automatically through experience. This essay argues that data quality matters more than model size.";
