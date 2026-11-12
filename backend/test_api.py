@@ -30,6 +30,8 @@ check("health -> 200 and ok", r.status_code == 200 and r.get_json()["status"] ==
 # --- the browser page ---
 r = client.get("/")
 check("home page -> 200 html", r.status_code == 200 and b"plagC" in r.data)
+check("favicon is served", client.get("/static/favicon.svg").status_code == 200)
+check("home page links the favicon", b"favicon.svg" in client.get("/").data)
 check("stylesheet is served", client.get("/static/style.css").status_code == 200)
 check("script is served", client.get("/static/app.js").status_code == 200)
 check("unknown page -> 404", client.get("/nothing-here").status_code == 404)
