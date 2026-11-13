@@ -1,0 +1,8 @@
+.git
+venv
+**/__pycache__
+**/*.pyc
+**/*.so
+cpp_core/test_edge_cases
+cpp_core/test_matcher
+docs

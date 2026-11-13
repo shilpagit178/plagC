@@ -57,6 +57,13 @@ cd ..
 python backend/app.py        # then open http://localhost:5000
 ```
 
+Or with Docker:
+
+```bash
+docker build -t plagc .
+docker run --rm -p 127.0.0.1:8080:10000 plagc   # then open http://localhost:8080
+```
+
 ## API
 
 `POST /api/check` with `textA` and either `textB` or `urlB`. Returns
