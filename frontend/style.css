@@ -63,3 +63,5 @@ main{padding:28px 20px 56px}
 .inputs section{display:flex;flex-direction:column;min-height:0}
 .inputs textarea{flex:1;height:auto;min-height:150px;resize:none}
 @media(max-width:760px){.first{min-height:0}.inputs{grid-template-rows:none}.inputs textarea{min-height:170px}}
+/* when the report scrolls into view, keep it clear of the sticky header */
+.report{scroll-margin-top:90px}
