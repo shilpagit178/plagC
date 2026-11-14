@@ -1,5 +1,7 @@
 # plagC
 
+**Live demo:** https://plagc.onrender.com (free tier, may take a minute to wake. so, kindly cope :)
+
 A web-based plagiarism detector. Paste your text, then paste a source text or
 give a web page address, and plagC highlights every passage that appears word
 for word in both, with a similarity score.
@@ -90,7 +92,6 @@ python backend/test_download.py
 
 ## Roadmap
 
-- Deploy a public demo (Docker, gunicorn, Render)
 - Rate limiting and request logging for the public demo
 - Continuous integration: build the module and run every test suite on each push
 - Measured benchmarks: the C++ engine against an equivalent pure-Python version
